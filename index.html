@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OutfitKart | Premium Fashion (Supabase)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; -webkit-tap-highlight-color: transparent; }
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        .fade-in { animation: fadeIn 0.3s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800 pb-20 overflow-x-hidden">
+
+    <header class="fixed top-0 w-full bg-white shadow-sm z-40 h-16 flex items-center justify-between px-4 md:px-8">
+        <div class="flex items-center gap-4">
+            <h1 id="main-logo" class="text-2xl font-bold text-rose-600 cursor-pointer tracking-tight" onclick="handleLogoClick()">OutfitKart</h1>
+        </div>
+        
+        <div class="hidden md:flex relative w-1/3">
+            <input type="text" id="desktop-search" placeholder="Search products..." class="w-full bg-gray-100 rounded-md py-2 px-4 focus:outline-none focus:ring-1 focus:ring-rose-500" oninput="handleSearch(this.value)">
+            <div id="desktop-search-results" class="absolute top-10 left-0 w-full bg-white shadow-lg rounded-b-md hidden max-h-64 overflow-y-auto z-50"></div>
+        </div>
+
+        <div class="flex items-center gap-5">
+            <button class="text-gray-600 hover:text-rose-600" onclick="navigate('profile')"><i class="far fa-user text-xl"></i></button>
+            <button class="text-gray-600 hover:text-rose-600 relative" onclick="toggleCart()">
+                <i class="fas fa-shopping-bag text-xl"></i>
+                <span id="cart-count" class="absolute -top-2 -right-2 bg-rose-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">0</span>
+            </button>
+        </div>
+    </header>
+
+    <main id="app-content" class="pt-16 min-h-screen">
+        
+        <div id="view-home" class="view-section">
+            <div class="md:hidden p-3 bg-white relative">
+                <input type="text" id="mobile-search" placeholder="Search..." class="w-full bg-gray-100 rounded-md py-2 px-10 focus:outline-none" oninput="handleSearch(this.value)">
+                <i class="fas fa-search absolute left-6 top-5 text-gray-400"></i>
+                <div id="mobile-search-results" class="absolute top-12 left-0 w-full bg-white shadow-lg rounded-b-md hidden max-h-64 overflow-y-auto z-50"></div>
+            </div>
+
+            <div class="w-full bg-gradient-to-r from-rose-100 to-teal-100 p-8 flex flex-col items-center text-center">
+                <h2 class="text-3xl font-extrabold mb-2">Premium Fashion</h2>
+                <button onclick="navigate('shop')" class="bg-rose-600 text-white px-6 py-2 rounded-full font-bold shadow-md">Shop Now</button>
+            </div>
+
+            <div class="bg-white py-4 mt-2">
+                <h3 class="font-bold px-4 mb-3">Categories</h3>
+                <div class="flex overflow-x-auto hide-scrollbar px-4 gap-4" id="category-bubbles"></div>
+            </div>
+
+            <div class="mt-4 bg-white p-4">
+                <h3 class="font-bold text-xl mb-4">Trending Now 🔥</h3>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4" id="trending-grid"></div>
+            </div>
+        </div>
+
+        <div id="view-shop" class="view-section hidden p-4">
+            <h2 id="shop-title" class="text-2xl font-bold mb-4">All Products</h2>
+            <div class="flex gap-2 overflow-x-auto hide-scrollbar mb-4" id="subcategory-filters"></div>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4" id="shop-grid"></div>
+        </div>
+
+        <div id="view-combo" class="view-section hidden p-4 max-w-4xl mx-auto">
+            <h2 class="text-2xl font-bold mb-4">Build Your Outfit</h2>
+            <div class="grid md:grid-cols-2 gap-6">
+                <div class="space-y-4">
+                    <select id="combo-top" class="w-full border p-3 rounded" onchange="updateComboPreview()"><option value="">Select Top</option></select>
+                    <select id="combo-bottom" class="w-full border p-3 rounded" onchange="updateComboPreview()"><option value="">Select Bottom</option></select>
+                    <select id="combo-shoes" class="w-full border p-3 rounded" onchange="updateComboPreview()"><option value="">Select Shoes</option></select>
+                </div>
+                <div class="bg-gray-100 p-6 rounded-lg text-center">
+                    <div id="combo-preview-images" class="flex flex-col items-center gap-2 mb-4"></div>
+                    <div class="font-bold text-xl mb-4" id="combo-total-price">₹0</div>
+                    <button onclick="addComboToCart()" class="w-full bg-rose-600 text-white py-3 rounded font-bold">Add to Cart</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="view-checkout" class="view-section hidden p-4 max-w-2xl mx-auto">
+            <h2 class="text-2xl font-bold mb-6">Checkout</h2>
+            <div class="bg-white p-6 rounded shadow-sm border space-y-4">
+                <div id="checkout-items" class="space-y-2"></div>
+                <hr>
+                <div class="flex justify-between font-bold text-xl"><span>Total:</span><span id="check-total">₹0</span></div>
+                <button onclick="placeOrder()" class="w-full bg-green-600 text-white py-3 rounded font-bold">Confirm COD Order</button>
+            </div>
+        </div>
+
+        <div id="view-profile" class="view-section hidden p-4 max-w-md mx-auto">
+            <div id="auth-forms" class="bg-white p-6 rounded shadow border mt-10">
+                <div class="flex border-b mb-6">
+                    <button onclick="switchAuthTab('login')" id="tab-login" class="flex-1 py-2 border-b-2 border-rose-600 font-bold">Login</button>
+                    <button onclick="switchAuthTab('signup')" id="tab-signup" class="flex-1 py-2 text-gray-400">Sign Up</button>
+                </div>
+                <form id="form-login" onsubmit="handleLogin(event)" class="space-y-4">
+                    <input type="tel" id="login-mobile" placeholder="Mobile Number" required class="w-full border p-2 rounded">
+                    <input type="password" id="login-password" placeholder="Password" required class="w-full border p-2 rounded">
+                    <button type="submit" class="w-full bg-rose-600 text-white py-2 rounded font-bold">Login</button>
+                </form>
+                <form id="form-signup" onsubmit="handleSignup(event)" class="space-y-4 hidden">
+                    <input type="text" id="signup-name" placeholder="Full Name" required class="w-full border p-2 rounded">
+                    <input type="tel" id="signup-mobile" placeholder="Mobile Number" required class="w-full border p-2 rounded">
+                    <input type="password" id="signup-password" placeholder="Password" required class="w-full border p-2 rounded">
+                    <button type="submit" class="w-full bg-rose-600 text-white py-2 rounded font-bold">Create Account</button>
+                </form>
+            </div>
+
+            <div id="user-dashboard" class="hidden bg-white p-6 rounded shadow text-center mt-10">
+                <div class="w-20 h-20 bg-rose-100 text-rose-600 rounded-full mx-auto flex items-center justify-center text-3xl font-bold mb-4" id="user-avatar">U</div>
+                <h2 class="text-2xl font-bold" id="user-greeting">Welcome!</h2>
+                <div class="bg-gray-900 text-white p-6 rounded-xl my-6">
+                    <p class="text-xs text-gray-400 uppercase tracking-widest">Wallet Balance</p>
+                    <div class="text-4xl font-black mt-1" id="wallet-display">₹0</div>
+                </div>
+                <button onclick="handleLogout()" class="text-red-500 font-bold underline">Logout</button>
+            </div>
+        </div>
+
+        <div id="view-admin" class="view-section hidden p-4 max-w-2xl mx-auto">
+            <h2 class="text-2xl font-bold text-purple-700 mb-6">Admin Panel (Supabase)</h2>
+            <form onsubmit="adminAddProduct(event)" class="space-y-3 bg-white p-4 rounded shadow border">
+                <input type="text" id="ap-name" placeholder="Product Name" required class="w-full border p-2">
+                <input type="number" id="ap-price" placeholder="Price" required class="w-full border p-2">
+                <input type="text" id="ap-cat" placeholder="Category (Boys/Girls)" required class="w-full border p-2">
+                <input type="text" id="ap-sub" placeholder="Subcategory" required class="w-full border p-2">
+                <input type="text" id="ap-img" placeholder="Image URL" class="w-full border p-2">
+                <button type="submit" class="w-full bg-purple-600 text-white py-2 font-bold">Add Product</button>
+            </form>
+        </div>
+
+    </main>
+
+    <div id="cart-overlay" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden" onclick="toggleCart()"></div>
+    <div id="cart-sidebar" class="fixed top-0 right-0 w-80 h-full bg-white z-50 transform translate-x-full transition-transform duration-300 shadow-2xl flex flex-col">
+        <div class="p-4 border-b font-bold flex justify-between">
+            <span>Your Bag</span>
+            <button onclick="toggleCart()"><i class="fas fa-times"></i></button>
+        </div>
+        <div id="cart-items" class="flex-1 overflow-y-auto p-4 space-y-4"></div>
+        <div class="p-4 border-t">
+            <div class="flex justify-between font-bold text-lg mb-4"><span>Total:</span><span id="cart-total">₹0</span></div>
+            <button onclick="proceedToCheckout()" class="w-full bg-rose-600 text-white py-3 rounded font-bold">Checkout</button>
+        </div>
+    </div>
+
+    <nav class="fixed bottom-0 w-full bg-white border-t flex justify-around py-3 z-40 text-[10px] font-bold text-gray-400">
+        <div onclick="navigate('home')" class="flex flex-col items-center"><i class="fas fa-home text-lg"></i>HOME</div>
+        <div onclick="navigate('shop')" class="flex flex-col items-center"><i class="fas fa-search text-lg"></i>SHOP</div>
+        <div onclick="navigate('combo')" class="relative -top-4"><div class="bg-rose-600 text-white h-12 w-12 rounded-full flex items-center justify-center border-4 border-white shadow-lg"><i class="fas fa-magic"></i></div></div>
+        <div onclick="toggleCart()" class="flex flex-col items-center"><i class="fas fa-shopping-bag text-lg"></i>BAG</div>
+        <div onclick="navigate('profile')" class="flex flex-col items-center"><i class="far fa-user text-lg"></i>PROFILE</div>
+    </nav>
+
+    <div id="toast-container" class="fixed bottom-24 left-1/2 transform -translate-x-1/2 z-50"></div>
+
+    <script>
+        // CONFIG
+        const SB_URL = 'https://wlgytgwmmefwpljstque.supabase.co';
+        const SB_KEY = 'sb_publishable_fFampYvNGSn7TE0TOy56dQ_xXrer_P8';
+        const supabase = window.supabase.createClient(SB_URL, SB_KEY);
+
+        let products = [];
+        let cart = JSON.parse(localStorage.getItem('cart_v2')) || [];
+        let currentUser = null;
+        let logoTapCount = 0;
+        let logoTapTimer;
+
+        // INIT
+        document.addEventListener("DOMContentLoaded", async () => {
+            await fetchProducts();
+            await checkUser();
+            updateCartCount();
+            renderCategories();
+            checkReferral();
+        });
+
+        // HIDDEN ADMIN SHORTCUT (5 Taps on Logo)
+        function handleLogoClick() {
+            logoTapCount++;
+            clearTimeout(logoTapTimer);
+            logoTapTimer = setTimeout(() => logoTapCount = 0, 2000);
+            if(logoTapCount === 5) {
+                if(prompt("Admin Key:") === "1234") navigate('admin');
+                logoTapCount = 0;
+            } else { navigate('home'); }
+        }
+
+        async function fetchProducts() {
+            const { data } = await supabase.from('products').select('*');
+            if(data) {
+                products = data;
+                renderProductGrid('trending-grid', products.filter(p => p.isTrending));
+                populateCombo();
+            }
+        }
+
+        async function checkUser() {
+            const { data: { user } } = await supabase.auth.getUser();
+            if(user) {
+                const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+                currentUser = { ...user, ...profile };
+                document.getElementById('auth-forms').classList.add('hidden');
+                document.getElementById('user-dashboard').classList.remove('hidden');
+                document.getElementById('user-greeting').innerText = `Hey, ${currentUser.name}!`;
+                document.getElementById('wallet-display').innerText = `₹${currentUser.wallet_balance || 0}`;
+                document.getElementById('user-avatar').innerText = currentUser.name[0].toUpperCase();
+            }
+        }
+
+        // AUTH
+        async function handleSignup(e) {
+            e.preventDefault();
+            const name = document.getElementById('signup-name').value;
+            const mobile = document.getElementById('signup-mobile').value;
+            const password = document.getElementById('signup-password').value;
+            const email = mobile + "@outfitkart.com";
+
+            const { data, error } = await supabase.auth.signUp({ email, password });
+            if(error) return showToast(error.message);
+            
+            await supabase.from('profiles').insert([{ id: data.user.id, name, mobile, wallet_balance: 100 }]);
+            showToast("Welcome! ₹100 Bonus Added.");
+            location.reload();
+        }
+
+        async function handleLogin(e) {
+            e.preventDefault();
+            const mobile = document.getElementById('login-mobile').value;
+            const password = document.getElementById('login-password').value;
+            const { error } = await supabase.auth.signInWithPassword({ email: mobile + "@outfitkart.com", password });
+            if(error) showToast("Wrong mobile or password");
+            else location.reload();
+        }
+
+        function handleLogout() { supabase.auth.signOut().then(() => location.reload()); }
+
+        // NAVIGATION & UI
+        function navigate(view, cat = null) {
+            document.querySelectorAll('.view-section').forEach(v => v.classList.add('hidden'));
+            document.getElementById(`view-${view}`).classList.remove('hidden');
+            window.scrollTo(0,0);
+            if(view === 'shop') renderShop(cat);
+        }
+
+        function renderProductGrid(id, list) {
+            document.getElementById(id).innerHTML = list.map(p => `
+                <div class="bg-white rounded p-2 shadow-sm border relative">
+                    <button onclick="shareProduct(${p.id})" class="absolute top-2 right-2 text-green-600 bg-white/80 p-1 rounded-full"><i class="fas fa-share-alt"></i></button>
+                    <img src="${p.img}" class="w-full h-40 object-cover rounded mb-2">
+                    <h4 class="text-xs font-bold truncate">${p.name}</h4>
+                    <p class="font-bold text-rose-600">₹${p.price}</p>
+                    <button onclick="addToCart(${p.id})" class="w-full bg-black text-white text-[10px] py-2 rounded mt-2 uppercase font-bold">Add to Bag</button>
+                </div>
+            `).join('');
+        }
+
+        // CART LOGIC
+        function addToCart(pid) {
+            const p = products.find(x => x.id == pid);
+            const item = cart.find(i => i.id == pid);
+            if(item) item.qty++; else cart.push({...p, qty: 1});
+            saveCart(); showToast("Added to Bag");
+        }
+
+        function saveCart() {
+            localStorage.setItem('cart_v2', JSON.stringify(cart));
+            updateCartCount();
+        }
+
+        function updateCartCount() {
+            document.getElementById('cart-count').innerText = cart.length;
+        }
+
+        function toggleCart() {
+            const sidebar = document.getElementById('cart-sidebar');
+            sidebar.classList.toggle('translate-x-full');
+            document.getElementById('cart-overlay').classList.toggle('hidden');
+            if(!sidebar.classList.contains('translate-x-full')) renderCart();
+        }
+
+        function renderCart() {
+            let total = 0;
+            document.getElementById('cart-items').innerHTML = cart.map(i => {
+                total += i.price * i.qty;
+                return `<div class="flex gap-3 border-b pb-2">
+                    <img src="${i.img}" class="w-12 h-16 object-cover rounded">
+                    <div class="flex-1 text-sm">
+                        <p class="font-bold">${i.name}</p>
+                        <p>₹${i.price} x ${i.qty}</p>
+                    </div>
+                </div>`;
+            }).join('');
+            document.getElementById('cart-total').innerText = `₹${total}`;
+        }
+
+        function proceedToCheckout() {
+            if(!currentUser) return navigate('profile');
+            if(cart.length === 0) return showToast("Bag is empty");
+            toggleCart(); navigate('checkout');
+            let total = 0;
+            document.getElementById('checkout-items').innerHTML = cart.map(i => {
+                total += i.price * i.qty;
+                return `<div class="flex justify-between text-sm"><span>${i.name} (x${i.qty})</span><span>₹${i.price*i.qty}</span></div>`;
+            }).join('');
+            document.getElementById('check-total').innerText = `₹${total}`;
+        }
+
+        async function placeOrder() {
+            const total = parseInt(document.getElementById('check-total').innerText.replace('₹',''));
+            const { error } = await supabase.from('orders').insert([{
+                user_id: currentUser.id,
+                items: cart,
+                total_amount: total,
+                status: 'Pending'
+            }]);
+
+            // Referral Payout
+            const ref = sessionStorage.getItem('active_ref');
+            if(ref) {
+                const { refMobile } = JSON.parse(ref);
+                const { data: rUser } = await supabase.from('profiles').select('*').eq('mobile', refMobile).single();
+                if(rUser) await supabase.from('profiles').update({ wallet_balance: rUser.wallet_balance + 20 }).eq('id', rUser.id);
+            }
+
+            if(!error) { showToast("Order Placed! 🥳"); cart = []; saveCart(); setTimeout(() => navigate('home'), 2000); }
+        }
+
+        // REFERRAL
+        function shareProduct(pid) {
+            if(!currentUser) return showToast("Login to share & earn!");
+            const link = `${window.location.origin}${window.location.pathname}?ref=${currentUser.mobile}&pid=${pid}`;
+            navigator.clipboard.writeText(link);
+            showToast("Referral link copied! Earn ₹20 on sale.");
+        }
+
+        function checkReferral() {
+            const p = new URLSearchParams(window.location.search);
+            if(p.get('ref')) sessionStorage.setItem('active_ref', JSON.stringify({ refMobile: p.get('ref'), pid: p.get('pid') }));
+        }
+
+        // UTILS
+        function showToast(m) {
+            const t = document.createElement('div');
+            t.className = "bg-gray-800 text-white px-6 py-3 rounded-full shadow-lg mb-2 fade-in text-sm font-bold";
+            t.innerText = m;
+            document.getElementById('toast-container').appendChild(t);
+            setTimeout(() => t.remove(), 3000);
+        }
+
+        function renderCategories() {
+            const cats = [
+                {n: 'Boys', i: 'fa-child'}, {n: 'Girls', i: 'fa-child-dress'}, 
+                {n: 'Couples', i: 'fa-user-friends'}, {n: 'Combos', i: 'fa-boxes'}
+            ];
+            document.getElementById('category-bubbles').innerHTML = cats.map(c => `
+                <div onclick="navigate('shop', '${c.n}')" class="flex flex-col items-center min-w-[70px]">
+                    <div class="w-14 h-14 rounded-full bg-rose-50 flex items-center justify-center text-rose-600 border border-rose-100"><i class="fas ${c.i}"></i></div>
+                    <span class="text-[10px] mt-1 font-bold">${c.n}</span>
+                </div>
+            `).join('');
+        }
+
+        function switchAuthTab(t) {
+            document.getElementById('form-login').classList.toggle('hidden', t !== 'login');
+            document.getElementById('form-signup').classList.toggle('hidden', t === 'login');
+            document.getElementById('tab-login').className = t === 'login' ? "flex-1 py-2 border-b-2 border-rose-600 font-bold" : "flex-1 py-2 text-gray-400";
+            document.getElementById('tab-signup').className = t === 'signup' ? "flex-1 py-2 border-b-2 border-rose-600 font-bold" : "flex-1 py-2 text-gray-400";
+        }
+    </script>
+</body>
+</html>
